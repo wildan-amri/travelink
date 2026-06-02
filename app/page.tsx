@@ -6,6 +6,7 @@ import { Car, MapPin, Users, Star, ArrowRight, Search, Shield, Clock, CreditCard
 import { Destination, Vehicle } from '@/lib/types';
 import { getDestinations } from '@/services/destination.service';
 import { getVehicles } from '@/services/vehicle.service';
+import { getVehicleImageByName } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -101,7 +102,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-white text-white hover:bg-white hover:text-gray-900 w-full sm:w-auto"
+                    className="border-white text-gray hover:bg-white hover:text-gray-900 w-full sm:w-auto"
                   >
                     Lihat Destinasi
                   </Button>
@@ -230,10 +231,11 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {vehicles.map((vehicle) => {
-                // Logika mencari gambar utama (isPrimary) atau gambar pertama
-                const primaryImage = vehicle.images?.find((img) => img.isPrimary)?.url
-                  || vehicle.images?.[0]?.url
-                  || 'https://images.pexels.com/photos/12065618/pexels-photo-12065618.jpeg?auto=compress&cs=tinysrgb&w=800'; // Fallback jika tidak ada gambar sama sekali
+                const primaryImage = getVehicleImageByName(
+                  vehicle.name,
+                  vehicle.images ?? null,
+                  (vehicle as any).image ?? null,
+                );
 
                 return (
                   <Link

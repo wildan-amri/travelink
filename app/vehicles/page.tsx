@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Search, Filter, Loader2, Users, MapPin, Star } from 'lucide-react';
 import { Vehicle, VehicleCategory } from '@/lib/types';
 import { getVehicles, getVehicleCategories } from '@/services/vehicle.service';
+import { getVehicleImageByName } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -179,14 +180,11 @@ export default function VehiclesPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredVehicles.map((vehicle) => {
-                    // Ambil array gambar dari property 'images' atau 'image'
-                    const vehicleImages = vehicle.images;
-
-                    // Cari gambar yang isPrimary, jika tidak ada ambil gambar pertama. 
-                    // Jika kosong total, pakai placeholder pexels bawaanmu.
-                    const primaryImage = vehicleImages?.find((img) => img.isPrimary)?.url
-                      || vehicleImages?.[0]?.url
-                      || "https://images.pexels.com/photos/12065618/pexels-photo-12065618.jpeg?auto=compress&cs=tinysrgb&w=800";
+                    const primaryImage = getVehicleImageByName(
+                      vehicle.name,
+                      vehicle.images ?? null,
+                      (vehicle as any).image ?? null,
+                    );
 
                     return (
                       <Card key={vehicle.id} className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow">

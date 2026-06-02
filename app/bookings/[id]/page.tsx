@@ -21,6 +21,7 @@ import {
 import { Booking } from '@/lib/types';
 import { getBookingById, cancelBooking } from '@/services/booking.service';
 import { createReview } from '@/services/review.service';
+import { getVehicleImageByName } from '@/lib/utils';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -52,6 +53,22 @@ function BookingDetailContent() {
   const [cancelDialog, setCancelDialog] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [reviewDialog, setReviewDialog] = useState(false);
+  const cancellableStatuses = ['PENDING', 'CONFIRMED'] as const;
+
+  const normalizeStatus = (status?: any) => {
+    if (status === null || typeof status === 'undefined') return undefined;
+    if (typeof status === 'object') {
+      status = status.status ?? status.value ?? status.name ?? status;
+    }
+    return String(status).toString().trim().toUpperCase() as Booking['status'];
+  };
+
+  const canCancelBooking = (status?: any) => {
+    const normalized = normalizeStatus(status);
+    if (!normalized) return true;
+    return !['CANCELLED', 'COMPLETED'].includes(normalized);
+  };
+
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -84,6 +101,14 @@ function BookingDetailContent() {
       month: 'long',
       year: 'numeric',
     });
+  };
+
+  const getBookingVehicleImage = () => {
+    return getVehicleImageByName(
+      booking?.vehicle?.name,
+      booking?.vehicle?.images ?? null,
+      (booking?.vehicle as any)?.image ?? null,
+    );
   };
 
   const handleCancel = async () => {
@@ -131,8 +156,8 @@ function BookingDetailContent() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  const getStatusIcon = (status?: string) => {
+    switch (normalizeStatus(status)) {
       case 'PENDING':
         return <Clock className="h-5 w-5" />;
       case 'CONFIRMED':
@@ -193,10 +218,10 @@ function BookingDetailContent() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Booking ID #{booking.id}</p>
-                      <Badge className={bookingStatusConfig[booking.status || 'PENDING']?.color}>
+                      <Badge className={bookingStatusConfig[normalizeStatus(booking.status) || 'PENDING']?.color}>
                         <span className="flex items-center gap-1">
-                          {getStatusIcon(booking.status || 'PENDING')}
-                          {bookingStatusConfig[booking.status || 'PENDING']?.label}
+                          {getStatusIcon(booking.status)}
+                          {bookingStatusConfig[normalizeStatus(booking.status) || 'PENDING']?.label}
                         </span>
                       </Badge>
                     </div>
@@ -216,7 +241,7 @@ function BookingDetailContent() {
                   <div className="flex flex-col md:flex-row">
                     <div className="md:w-80 h-48 md:h-auto relative">
                       <img
-                        src="https://images.pexels.com/photos/12065618/pexels-photo-12065618.jpeg?auto=compress&cs=tinysrgb&w=600"
+                        src={getBookingVehicleImage()}
                         alt={booking.vehicle?.name || 'Vehicle'}
                         className="w-full h-full object-cover"
                       />
@@ -298,7 +323,7 @@ function BookingDetailContent() {
                   <CardTitle>Aksi</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {booking.status === 'PENDING' && (
+                  {canCancelBooking(booking.status) && (
                     <Button
                       className="w-full"
                       variant="destructive"
@@ -307,7 +332,7 @@ function BookingDetailContent() {
                       Batalkan Booking
                     </Button>
                   )}
-                  {booking.status === 'COMPLETED' && (
+                  {normalizeStatus(booking.status) === 'COMPLETED' && (
                     <Button
                       className="w-full bg-blue-600 hover:bg-blue-700"
                       onClick={() => setReviewDialog(true)}

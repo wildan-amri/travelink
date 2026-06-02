@@ -24,21 +24,37 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { getVehicleImageByName } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 import { createBooking } from '@/services/booking.service';
+
+const getStartOfDay = (date: Date) => {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+};
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const isValidDate = (date: Date | undefined): date is Date => {
+  return date instanceof Date && !isNaN(date.getTime());
+};
+
+const getTomorrow = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return getStartOfDay(tomorrow);
+};
 
 export default function VehicleDetailPage() {
   const params = useParams();
@@ -49,9 +65,8 @@ export default function VehicleDetailPage() {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [bookingOpen, setBookingOpen] = useState(false);
-  const [startDate, setStartDate] = useState<Date | undefined>(new Date());
-  const [endDate, setEndDate] = useState<Date | undefined>(new Date());
+  const [startDate, setStartDate] = useState<Date | undefined>(getStartOfDay(new Date()));
+  const [endDate, setEndDate] = useState<Date | undefined>(getTomorrow());
   const [notes, setNotes] = useState('');
   const [bookingLoading, setBookingLoading] = useState(false);
 
@@ -81,13 +96,30 @@ export default function VehicleDetailPage() {
     }).format(price);
   };
 
-  const calculateTotal = () => {
-    if (!startDate || !endDate || !vehicle) return 0;
-    const days = Math.ceil(
-      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1;
-    return days * vehicle.pricePerDay;
+  const getVehicleImage = () => {
+    return getVehicleImageByName(vehicle?.name, (vehicle as any).images ?? null);
   };
+
+  const calculateTotal = () => {
+    if (!isValidDate(startDate) || !isValidDate(endDate) || !vehicle) return 0;
+    const normalizedStart = getStartOfDay(startDate);
+    const normalizedEnd = getStartOfDay(endDate);
+    const ONE_DAY = 1000 * 60 * 60 * 24;
+    const days = Math.ceil((normalizedEnd.getTime() - normalizedStart.getTime()) / ONE_DAY);
+    return Math.max(days, 0) * vehicle.pricePerDay;
+  };
+
+  useEffect(() => {
+    if (isValidDate(startDate) && isValidDate(endDate)) {
+      const normalizedStart = getStartOfDay(startDate);
+      const normalizedEnd = getStartOfDay(endDate);
+      if (normalizedEnd <= normalizedStart) {
+        setEndDate(getTomorrow());
+      }
+    }
+  }, [startDate, endDate]);
+
+  const { toast } = useToast();
 
   const handleBooking = async () => {
     if (!isAuth) {
@@ -95,20 +127,47 @@ export default function VehicleDetailPage() {
       return;
     }
 
-    if (!startDate || !endDate) return;
+    if (!isValidDate(startDate) || !isValidDate(endDate)) {
+      toast({
+        variant: 'destructive',
+        title: 'Tanggal tidak valid',
+        description: 'Silakan pilih tanggal mulai dan selesai yang benar.',
+      });
+      return;
+    }
+
+    const normalizedStart = getStartOfDay(startDate);
+    const normalizedEnd = getStartOfDay(endDate);
+
+    if (normalizedEnd <= normalizedStart) {
+      toast({
+        variant: 'destructive',
+        title: 'Tanggal tidak valid',
+        description: 'Tanggal selesai harus setelah tanggal mulai.',
+      });
+      return;
+    }
 
     setBookingLoading(true);
     try {
-      await createBooking({
+      const booking = await createBooking({
         vehicleId: vehicle!.id,
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
+        startDate: formatLocalDate(normalizedStart),
+        endDate: formatLocalDate(normalizedEnd),
         notes: notes || undefined,
       });
-      setBookingOpen(false);
+      toast({
+        title: 'Booking Terkonfirmasi',
+        description: `Booking ${vehicle?.name} berhasil dibuat dan masuk ke akun Anda. ID: #${booking.id}`,
+      });
       router.push('/bookings');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create booking:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Booking gagal',
+        description: error?.response?.data?.message || 'Tidak dapat membuat booking saat ini.',
+      });
     } finally {
       setBookingLoading(false);
     }
@@ -163,7 +222,7 @@ export default function VehicleDetailPage() {
               <Card className="overflow-hidden border-0 shadow-md">
                 <div className="relative h-96">
                   <img
-                    src="https://images.pexels.com/photos/12065618/pexels-photo-12065618.jpeg?auto=compress&cs=tinysrgb&w=1260"
+                    src={getVehicleImage()}
                     alt={vehicle.name}
                     className="w-full h-full object-cover"
                   />
@@ -296,7 +355,7 @@ export default function VehicleDetailPage() {
                           mode="single"
                           selected={startDate}
                           onSelect={setStartDate}
-                          disabled={(date) => date < new Date()}
+                          disabled={(date) => date < getStartOfDay(new Date())}
                           className="rounded-md border-0"
                         />
                       </div>
@@ -309,7 +368,11 @@ export default function VehicleDetailPage() {
                           mode="single"
                           selected={endDate}
                           onSelect={setEndDate}
-                          disabled={(date) => date < (startDate || new Date())}
+                          disabled={(date) =>
+                            !isValidDate(startDate)
+                              ? date < getStartOfDay(new Date())
+                              : date <= getStartOfDay(startDate)
+                          }
                           className="rounded-md border-0"
                         />
                       </div>

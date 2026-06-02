@@ -131,7 +131,7 @@ export default function DestinationDetailPage() {
                   <Card key={vehicle.id} className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow">
                     <div className="relative h-48 overflow-hidden bg-gray-100">
                       <img
-                        src="https://images.pexels.com/photos/12065618/pexels-photo-12065618.jpeg?auto=compress&cs=tinysrgb&w=800"
+                        src="https://images.pexels.com/photos/12065618/pexels-photo-12065618.jpeg?auto=compress&cs=tinysrgb&w=1260"
                         alt={vehicle.name}
                         className="w-full h-full object-cover"
                       />

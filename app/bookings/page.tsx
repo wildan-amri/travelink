@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Calendar, MapPin, Car, Loader2, XCircle, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { Booking } from '@/lib/types';
 import { getMyBookings, cancelBooking } from '@/services/booking.service';
+import { getVehicleImageByName } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
@@ -23,12 +24,40 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 
+
 function BookingsContent() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelDialog, setCancelDialog] = useState<number | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const { toast } = useToast();
+
+  const cancellableStatuses = ['PENDING', 'CONFIRMED'] as const;
+
+  const normalizeStatus = (status?: string) => {
+    if (!status) return undefined;
+    return status.toString().trim().toUpperCase() as Booking['status'];
+  };
+
+  const canCancelBooking = (status?: string) => {
+    const normalized = normalizeStatus(status);
+    if (!normalized) return true;
+    return !['CANCELLED', 'COMPLETED'].includes(normalized);
+  };
+
+  const getStatusLabel = (status?: string) => {
+    const normalized = normalizeStatus(status);
+    if (normalized && bookingStatusConfig[normalized]) {
+      return bookingStatusConfig[normalized].label;
+    }
+    return status ? String(status) : 'Tidak Diketahui';
+  };
+
+  const getStatusColor = (status?: string) => {
+    const normalized = normalizeStatus(status);
+    if (!normalized) return 'bg-gray-100 text-gray-800 border-gray-200';
+    return bookingStatusConfig[normalized]?.color || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
 
   useEffect(() => {
     const fetchBookings = async () => {
@@ -84,8 +113,16 @@ function BookingsContent() {
     });
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  const getBookingVehicleImage = (booking: Booking) => {
+    return getVehicleImageByName(
+      booking.vehicle?.name,
+      booking.vehicle?.images ?? null,
+      (booking.vehicle as any)?.image ?? null,
+    );
+  };
+
+  const getStatusIcon = (status?: string) => {
+    switch (normalizeStatus(status)) {
       case 'PENDING':
         return <Clock className="h-4 w-4" />;
       case 'CONFIRMED':
@@ -138,7 +175,7 @@ function BookingsContent() {
                       {/* Vehicle Info */}
                       <div className="md:w-64 h-48 md:h-auto relative">
                         <img
-                          src="https://images.pexels.com/photos/12065618/pexels-photo-12065618.jpeg?auto=compress&cs=tinysrgb&w=400"
+                          src={getBookingVehicleImage(booking)}
                           alt={booking.vehicle?.name || 'Vehicle'}
                           className="w-full h-full object-cover"
                         />
@@ -158,10 +195,10 @@ function BookingsContent() {
                               </div>
                             )}
                           </div>
-                          <Badge className={bookingStatusConfig[booking.status || 'PENDING']?.color}>
+                          <Badge className={getStatusColor(booking.status)}>
                             <span className="flex items-center gap-1">
-                              {getStatusIcon(booking.status || 'PENDING')}
-                              {bookingStatusConfig[booking.status || 'PENDING']?.label}
+                              {getStatusIcon(booking.status)}
+                              {getStatusLabel(booking.status)}
                             </span>
                           </Badge>
                         </div>
@@ -205,7 +242,7 @@ function BookingsContent() {
                               Lihat Detail
                             </Button>
                           </Link>
-                          {booking.status === 'PENDING' && (
+                          {canCancelBooking(booking.status) && (
                             <Button
                               variant="destructive"
                               size="sm"
